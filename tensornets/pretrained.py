@@ -53,6 +53,7 @@ def assign(scopes):
     if not isinstance(scopes, list):
         scopes = [scopes]
     for scope in scopes:
+        print(scope)
         model_name = parse_scopes(scope)[0]
         try:
             __load_dict__[model_name](scope)
