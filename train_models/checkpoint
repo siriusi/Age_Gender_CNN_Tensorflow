@@ -1,0 +1,2 @@
+model_checkpoint_path: "age_gender_tensornets_wiki_cropface_model"
+all_model_checkpoint_paths: "age_gender_tensornets_wiki_cropface_model"

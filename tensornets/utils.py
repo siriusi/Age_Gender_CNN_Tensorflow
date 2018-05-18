@@ -302,7 +302,7 @@ def pretrained_initializer(scope, values):
         warnings.warn('The sizes of symbolic and actual weights do not match. '
                       'Never mind if you are trying to load stem layers only.')
 
-    if scope.dtype == tf.float16:
+    if not isinstance(scope, str) and scope.dtype == tf.float16:
         ops = [weights[0].assign(np.asarray(values[0], dtype=np.float16))]
         for (w, v) in zip(weights[1:-2], values[1:-2]):
             w.load(np.asarray(v, dtype=np.float16))
