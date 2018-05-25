@@ -18,12 +18,8 @@ from tensornets.ops import reduce_mean
 
 
 @var_scope('mobilenet100')
-def age_gender_model(inputs, outputs_age = None, outputs_gender = None, num_class = 80, batch_size = 100, learning_rate = 1e-5):
-    
-    is_training = True
-    if outputs_age == None:
-        is_training = False
-        
+def age_gender_model(inputs, is_training, outputs_age = None, outputs_gender = None, num_class = 80, batch_size = 100, learning_rate = 1e-5):
+            
     cnn_net = nets.MobileNet100(inputs, is_training = is_training, classes = num_class, stem=True)
     
     cnn_net = reduce_mean(cnn_net, [1, 2], name='avgpool')
@@ -75,25 +71,26 @@ def run_test(session, input_data, model_path = "train_models/age_gender_tensorne
         #saver_def = saver.as_saver_def()
         #print (saver_def.filename_tensor_name)
         #print (saver_def.restore_op_name)
-        #sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer())
         loader.restore(sess, tf.train.latest_checkpoint("train_models/"))
         inference_graph = tf.get_default_graph()
     
         cnn_predictions_age = inference_graph.get_tensor_by_name("mobilenet100/cnn_predictions_age:0")
         cnn_predictions_gender = inference_graph.get_tensor_by_name('mobilenet100/cnn_predictions_gender:0')
-        
-        feed = {'inputs_tensor:0' : input_data} 
+            
+        input_data = nets.preprocess('mobilenet100', input_data)
+        cv2.imshow("tes222t", input_data[0])
+        feed = {'inputs_tensor:0' : input_data, is_training : False} 
         cnn_predictions_age_test, cnn_predictions_gender_test = sess.run([cnn_predictions_age, cnn_predictions_gender], feed_dict=feed)
+        print("!!!!", cnn_predictions_age_test)
         for i in range(len(cnn_predictions_age_test)):
             cnn_predictions_age_test[i] = int(cnn_predictions_age_test[i]) + 10
     return cnn_predictions_age_test, cnn_predictions_gender_test
 
 
 def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_every=10, 
-              learning_rate = 1e-5, dropout = 0.5, is_save_summary = True):
-    
-    is_training = True
-    
+              learning_rate = 1e-5, dropout = 0.5, is_save_summary = True, load_model_path = None):
+        
     Xd = input_dict["X_train"]
     yd_age = input_dict["y_age_train"]
     yd_gender = input_dict["y_gender_train"]
@@ -112,6 +109,7 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
     with tf.Session() as sess:
 
         inputs = tf.placeholder(tf.float32, [None, 224, 224, 3], name = "inputs_tensor")
+        is_training = tf.placeholder(tf.bool, name = "is_training")
         outputs_age = tf.placeholder(tf.int32, [None])
         outputs_gender = tf.placeholder(tf.int32, [None])
         
@@ -156,6 +154,11 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
         #var_list += bn_moving_vars
         saver = tf.train.Saver(var_list = g_list, max_to_keep=2, keep_checkpoint_every_n_hours=2)
 
+        if (load_model_path != None):
+            loader = tf.train.import_meta_graph(load_model_path + ".meta")
+            sess.run(tf.global_variables_initializer())
+            loader.restore(sess, tf.train.latest_checkpoint("train_models/"))
+        
         for current_epoch in range(epochs):
             # training step
             ###for x_batch, y_batch in batch_set.batches():
@@ -181,8 +184,7 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
                 batch_Xd = nets.preprocess('mobilenet100', batch_Xd)
                 batch_yd_age = yd_age[idx]
                 batch_yd_gender = yd_gender[idx]
-                feed = {inputs : batch_Xd, outputs_age : batch_yd_age, outputs_gender : batch_yd_gender}                
-                
+                feed = {inputs : batch_Xd, outputs_age : batch_yd_age, outputs_gender : batch_yd_gender, is_training : True}                
                 global_step = global_step + 1
                 
                 _, total_loss_running, age_loss_running, gender_loss_running, cnn_MAE_age_running, \
@@ -212,7 +214,7 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
             #Xv = load_img_from_tensor(Xv, target_size=256, crop_size=224)
             #Xv = cnn_net.preprocess(Xv) 
             Xv = nets.preprocess('mobilenet100', Xv)
-            feed = {inputs : Xv, outputs_age : yv_age, outputs_gender : yv_gender} 
+            feed = {inputs : Xv, outputs_age : yv_age, outputs_gender : yv_gender, is_training : True} 
             total_loss_running, age_loss_running, gender_loss_running, cnn_MAE_age_running, \
                     cnn_accuracy_gender_running, summary_running = sess.run([total_loss, \
                     age_loss, gender_loss, cnn_MAE_age, cnn_accuracy_gender, test_summary], feed_dict=feed)

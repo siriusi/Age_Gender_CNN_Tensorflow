@@ -18,6 +18,7 @@ tf.app.flags.DEFINE_float('learning_rate', 7e-4, 'init learning rate')
 
 tf.app.flags.DEFINE_integer('print_every', 5, 'how often to print training status')
 tf.app.flags.DEFINE_boolean('is_save_summary', True, 'is save summary data')
+tf.app.flags.DEFINE_string('load_model_path', "./train_models/age_gender_tensornets_wiki_cropface_model_20180524_084755", 'path for loading model')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -47,7 +48,7 @@ def main(_):
         #print('Training')
         run_train(sess,age_gender_dict,num_class = 80, epochs=FLAGS.num_epochs, batch_size=FLAGS.batch_size,
                   print_every=FLAGS.print_every, learning_rate = FLAGS.learning_rate, 
-                  is_save_summary = FLAGS.is_save_summary)
+                  is_save_summary = FLAGS.is_save_summary, load_model_path = FLAGS.load_model_path)
         pass
     print("==================================================================")
     print("\n")
