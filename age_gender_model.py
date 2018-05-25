@@ -32,11 +32,11 @@ def age_gender_model(inputs, outputs_age = None, outputs_gender = None, num_clas
     cnn_net_age = fc(cnn_net, num_class, scope='logits_age')
     cnn_net_gender = fc(cnn_net, 2, scope='logits_gender')
     
-    cnn_net_age = softmax(cnn_net_age, name='probs')
-    cnn_net_gender = softmax(cnn_net_gender, name='probs')
+    cnn_net_age = softmax(cnn_net_age, name='probs_age')
+    cnn_net_gender = softmax(cnn_net_gender, name='probs_age')
 
-    cnn_predictions_age = tf.reduce_sum(tf.multiply(tf.range(0, 80, dtype = np.float32), cnn_net_age), axis = 1)
-    cnn_predictions_gender = tf.argmax(cnn_net_gender, axis = 1)
+    cnn_predictions_age = tf.reduce_sum(tf.multiply(tf.range(0, 80, dtype = np.float32), cnn_net_age), axis = 1, name = "cnn_predictions_age")
+    cnn_predictions_gender = tf.argmax(cnn_net_gender, axis = 1, name = "cnn_predictions_gender")
     
     if is_training == False:
         return cnn_predictions_age, cnn_predictions_gender
@@ -62,17 +62,31 @@ def age_gender_model(inputs, outputs_age = None, outputs_gender = None, num_clas
 
     return cnn_train, cnn_net_age, cnn_net_gender, total_loss, age_loss, gender_loss, cnn_MAE_age, cnn_accuracy_gender, cnn_predictions_age
 
-def run_test(session, input_tensor):
+def run_test(session, input_data, model_path = "train_models/age_gender_tensornets_wiki_cropface_model_20180519_123211"):
     cnn_predictions_age = 0
     cnn_predictions_gender = 0
     with tf.Session() as sess:
-        inputs = tf.placeholder(tf.float32, [None, 224, 224, 3])
-        saver = tf.train.import_meta_graph('train_models/age_gender_tensornets_wiki_cropface_model.meta')
-        saver.restore(sess, tf.train.latest_checkpoint("train_models/"))
-        cnn_predictions_age, cnn_predictions_gender = age_gender_model(inputs)
-        feed = {inputs : input_tensor} 
+        #inputs = tf.placeholder(tf.float32, [None, 224, 224, 3])        
+        loader = tf.train.import_meta_graph(model_path + ".meta")
+        
+        #saver.restore(sess, tf.train.latest_checkpoint("train_models/"))
+        #cnn_predictions_age, cnn_predictions_gender = age_gender_model(inputs)
+        #graph = tf.get_default_graph()
+        #saver_def = saver.as_saver_def()
+        #print (saver_def.filename_tensor_name)
+        #print (saver_def.restore_op_name)
+        #sess.run(tf.global_variables_initializer())
+        loader.restore(sess, tf.train.latest_checkpoint("train_models/"))
+        inference_graph = tf.get_default_graph()
+    
+        cnn_predictions_age = inference_graph.get_tensor_by_name("mobilenet100/cnn_predictions_age:0")
+        cnn_predictions_gender = inference_graph.get_tensor_by_name('mobilenet100/cnn_predictions_gender:0')
+        
+        feed = {'inputs_tensor:0' : input_data} 
         cnn_predictions_age_test, cnn_predictions_gender_test = sess.run([cnn_predictions_age, cnn_predictions_gender], feed_dict=feed)
-    return cnn_predictions_age_test + 10, cnn_predictions_gender_test
+        for i in range(len(cnn_predictions_age_test)):
+            cnn_predictions_age_test[i] = int(cnn_predictions_age_test[i]) + 10
+    return cnn_predictions_age_test, cnn_predictions_gender_test
 
 
 def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_every=10, 
@@ -97,12 +111,12 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
     
     with tf.Session() as sess:
 
-        inputs = tf.placeholder(tf.float32, [None, 224, 224, 3])
+        inputs = tf.placeholder(tf.float32, [None, 224, 224, 3], name = "inputs_tensor")
         outputs_age = tf.placeholder(tf.int32, [None])
         outputs_gender = tf.placeholder(tf.int32, [None])
         
-        cnn_train, cnn_net, cnn_net_age, cnn_net_gender, total_loss, age_loss, gender_loss, cnn_MAE_age, cnn_accuracy_gender, cnn_predictions_age = \
-                            age_gender_model(inputs, outputs_age, outputs_gender, num_class, batch_size, learning_rate, is_training)
+        cnn_train, cnn_net_age, cnn_net_gender, total_loss, age_loss, gender_loss, cnn_MAE_age, cnn_accuracy_gender, cnn_predictions_age = \
+                            age_gender_model(inputs, outputs_age, outputs_gender, num_class, batch_size, learning_rate)
         
         
         train_summary = tf.summary.merge([tf.summary.scalar("total_loss", total_loss),
@@ -135,12 +149,12 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
         
         global_step = 0
                   
-        var_list = tf.trainable_variables()
+        #var_list = tf.trainable_variables()
         g_list = tf.global_variables()
-        bn_moving_vars = [g for g in g_list if 'moving_mean' in g.name]
-        bn_moving_vars += [g for g in g_list if 'moving_variance' in g.name]
-        var_list += bn_moving_vars
-        saver = tf.train.Saver(var_list=var_list, max_to_keep=2, keep_checkpoint_every_n_hours=2)
+        #bn_moving_vars = [g for g in g_list if 'moving_mean' in g.name]
+        #bn_moving_vars += [g for g in g_list if 'moving_variance' in g.name]
+        #var_list += bn_moving_vars
+        saver = tf.train.Saver(var_list = g_list, max_to_keep=2, keep_checkpoint_every_n_hours=2)
 
         for current_epoch in range(epochs):
             # training step
@@ -205,8 +219,8 @@ def run_train(session, input_dict, num_class, epochs=3, batch_size=100,print_eve
             if is_save_summary:
                 summary_writer.add_summary(summary_running, current_epoch)
             print("{} epochs test result, total_loss:{:.4f}, aloss:{:.3f}, gloss:{:.3f}, gaccuracy:{:.3f}, ageMAE:{:.3f}, time/batch : {:.3f}sec"
-                      .format(current_epoch, total_loss_running, age_loss_running, gender_loss_running, cnn_MAE_age_running, \
-                           cnn_accuracy_gender_running, time.time() - start))
+                      .format(current_epoch, total_loss_running, age_loss_running, gender_loss_running, cnn_accuracy_gender_running, \
+                           cnn_MAE_age_running, time.time() - start))
             print("\n")
        
     return 

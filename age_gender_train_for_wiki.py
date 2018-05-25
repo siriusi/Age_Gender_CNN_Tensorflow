@@ -14,7 +14,7 @@ tf.app.flags.DEFINE_integer('batch_size', 500, 'batch size')
 tf.app.flags.DEFINE_integer('num_train_data', 58000, 'number of train data')
 tf.app.flags.DEFINE_integer('num_val_data', 2000, 'number of val data')
 tf.app.flags.DEFINE_integer('num_epochs', 4, 'number of epochs')
-tf.app.flags.DEFINE_float('learning_rate', 1e-5, 'init learning rate')
+tf.app.flags.DEFINE_float('learning_rate', 7e-4, 'init learning rate')
 
 tf.app.flags.DEFINE_integer('print_every', 5, 'how often to print training status')
 tf.app.flags.DEFINE_boolean('is_save_summary', True, 'is save summary data')

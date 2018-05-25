@@ -104,4 +104,4 @@ venv.bak/
 .mypy_cache/
 
 #tensorflow-model
-train_models/
+/train_models/
